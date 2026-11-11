@@ -1,56 +1,58 @@
+[![Русский](https://img.shields.io/badge/%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9-181717?style=for-the-badge)](README.ru.md)
+
 # PaymentsCloud
 
-Telegram-бот для приёма заявок на пополнение Steam. Пользователь указывает сумму и логин, оплачивает перевод через ЮMoney и проверяет его статус. Администратор получает оплаченный заказ и принимает его в работу. Само пополнение Steam выполняется вручную.
+A Telegram bot for Steam wallet top-up requests. Users enter an amount and Steam login, pay through YooMoney, and check the transfer status. An administrator receives the paid order and claims it for processing. Steam top-ups are fulfilled manually.
 
-## Возможности
+## Features
 
-- Заявки на 100–14 999 рублей с расчётом комиссии.
-- Оплата банковской картой через ЮMoney с проверкой владельца, метки, суммы, направления и статуса перевода.
-- Хранение пользователей и заявок в PostgreSQL, защита от повторного подтверждения.
-- Админская статистика и принятие заказа одним исполнителем.
-- Поддержка, ограничение частоты запросов и блокировка пользователей через Redis.
+- Requests for RUB 100–14,999 with fee calculation.
+- Bank card payments through YooMoney, with checks for the transfer owner, label, amount, direction, and status.
+- PostgreSQL storage for users and requests, with duplicate confirmation protection.
+- Administrator statistics and order claiming by a single operator.
+- Support, rate limiting, and user blocking through Redis.
 
-## Установка и запуск
+## Installation and startup
 
-Нужны Python 3.14, [uv](https://docs.astral.sh/uv/), PostgreSQL, Redis и публичный HTTPS-адрес для Telegram webhook. Точные версии закреплены в [.python-version](.python-version) и [uv.lock](uv.lock).
+Requires Python 3.14, [uv](https://docs.astral.sh/uv/), PostgreSQL, Redis, and a public HTTPS address for the Telegram webhook. Exact versions are pinned in [.python-version](.python-version) and [uv.lock](uv.lock).
 
 ```bash
 uv sync --frozen
 uv run --frozen python init_env.py
 ```
 
-Заполните созданный `.env` в редакторе. `init_env.py` однократно генерирует `WEBHOOK_SECRET`, устанавливает права `0600` и сохраняет существующий файл при повторном запуске. Остальные значения выдаются внешними сервисами. Все параметры из [.env.example](.env.example) обязательны:
+Fill in the generated `.env` using an editor. `init_env.py` generates `WEBHOOK_SECRET` once, sets permissions to `0600`, and preserves an existing file on subsequent runs. The remaining values come from external services. All settings in [.env.example](.env.example) are required:
 
-| Параметр            | Назначение                                  |
-| ------------------- | ------------------------------------------- |
-| `TOKEN`             | Токен Telegram-бота                         |
-| `PG_DSN`            | PostgreSQL DSN отдельной базы проекта       |
-| `REDIS_URL`         | Адрес отдельной базы Redis                  |
-| `WEBHOOK_SECRET`    | Секрет проверки Telegram webhook            |
-| `BASE_WEBHOOK_URL`  | Публичный HTTPS origin без пути             |
-| `YOOMONEY_TOKEN`    | Токен кошелька с правом `operation-history` |
-| `YOOMONEY_RECEIVER` | Номер кошелька для входящих переводов       |
-| `SUPPORT_URL`       | HTTPS-ссылка на поддержку                   |
+| Setting             | Purpose                                               |
+| ------------------- | ----------------------------------------------------- |
+| `TOKEN`             | Telegram bot token                                    |
+| `PG_DSN`            | PostgreSQL DSN for a dedicated project database        |
+| `REDIS_URL`         | Address of a dedicated Redis database                 |
+| `WEBHOOK_SECRET`    | Secret for validating the Telegram webhook            |
+| `BASE_WEBHOOK_URL`  | Public HTTPS origin without a path                    |
+| `YOOMONEY_TOKEN`    | Wallet token with `operation-history` permission       |
+| `YOOMONEY_RECEIVER` | Wallet number for incoming transfers                  |
+| `SUPPORT_URL`       | HTTPS support link                                    |
 
-Для удалённых PostgreSQL и Redis используйте TLS с проверкой сертификатов. Не помещайте секреты в команды и историю терминала.
+Use TLS with certificate verification for remote PostgreSQL and Redis connections. Keep secrets out of commands and terminal history.
 
 ```bash
 uv run --frozen --env-file .env python main.py
 ```
 
-Приложение слушает `127.0.0.1:8083`. Обратный прокси должен передавать HTTPS-запросы с пути `/webhook` на этот адрес. При старте создаются отсутствующие таблицы, проверяется Redis и регистрируется webhook. Существующие таблицы и заявки сохраняются.
+The application listens on `127.0.0.1:8083`. The reverse proxy must forward HTTPS requests from `/webhook` to this address. Startup creates missing tables, checks Redis, and registers the webhook. Existing tables and requests are preserved.
 
-## Использование
+## Usage
 
-После первого `/start` назначьте администратора через доверенный SQL-клиент, указав его Telegram ID параметром запроса:
+After the first `/start`, assign an administrator through a trusted SQL client, passing their Telegram ID as a query parameter:
 
 ```sql
 UPDATE public.paymentscloud_users SET admin = TRUE WHERE user_id = :user_id;
 ```
 
-Пользователь создаёт заявку, оплачивает её и запускает проверку перевода. Администратор принимает оплаченный заказ и вручную выполняет пополнение Steam.
+The user creates a request, pays for it, and starts the transfer check. The administrator claims the paid order and manually tops up the Steam wallet.
 
-## Проверки
+## Checks
 
 ```bash
 uv run --frozen python check.py
@@ -58,18 +60,18 @@ uv run --frozen pip-audit
 gitleaks git --redact
 ```
 
-`check.py` проверяет форматирование, статический анализ и изолированные регрессионные тесты с предупреждениями как ошибками. Тесты не обращаются к Telegram, ЮMoney и рабочим базам.
+`check.py` runs formatting checks, static analysis, and isolated regression tests with warnings treated as errors. Tests do not access Telegram, YooMoney, or production databases.
 
-Для проверки конкуренции и сохранения данных подготовьте чистую локальную PostgreSQL с базой `paymentscloud_test`. Запишите её DSN в `PAYMENTSCLOUD_TEST_DSN` отдельного `.env.integration`:
+To check concurrency and data preservation, prepare a clean local PostgreSQL instance with a `paymentscloud_test` database. Set its DSN as `PAYMENTSCLOUD_TEST_DSN` in a separate `.env.integration` file:
 
 ```bash
 uv run --frozen --env-file .env.integration python -m pytest -W error tests/integration_db.py
 ```
 
-Интеграционный тест изменяет только выделенную базу и принимает только `localhost` или `127.0.0.1`. На PostgreSQL 16 проверены конкуренция, идемпотентность, переходы статусов и сохранение записей при повторной инициализации.
+The integration test changes only the dedicated database and accepts only `localhost` or `127.0.0.1`. Concurrency, idempotency, status transitions, and record preservation on repeated initialization have been tested on PostgreSQL 16.
 
-## Ограничения
+## Limitations
 
-Настоящие переводы, webhook и подключение Redis требуют проверки со своими учётными данными. Перед приёмом реальных оплат нужны восстановление доставки уведомлений после сбоя и сверка незавершённых переводов: платёж после локальной отмены разбирается через поддержку, а сбой после успешного статуса может оставить администратора без уведомления.
+Real transfers, the webhook, and Redis connectivity require testing with your own credentials. Before accepting real payments, notification delivery recovery after failures and reconciliation of unfinished transfers still need to be implemented: payments received after local cancellation are handled through support, and a failure after a successful status update may leave the administrator without a notification.
 
-Форма ввода хранится в памяти и сбрасывается при перезапуске. Автоматического пополнения Steam и возвратов нет. Расчёт карточной комиссии основан на [документации ЮMoney](https://yoomoney.ru/docs/payment-buttons/using-api/forms); подключение и тарифы нужно сверить перед использованием.
+The input form is held in memory and resets on restart. There are no automatic Steam top-ups or refunds. Card fee calculation is based on the [YooMoney documentation](https://yoomoney.ru/docs/payment-buttons/using-api/forms); verify integration requirements and rates before use.
